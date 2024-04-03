@@ -297,10 +297,15 @@
 					},
 
 					// func finalizeRef(v ref)
-					"syscall/js.finalizeRef": (v_ref) => {
-						// Note: TinyGo does not support finalizers so this should never be
-						// called.
-						console.error('syscall/js.finalizeRef not implemented');
+					'syscall/js.finalizeRef': (v_ref) => {
+						const id = mem().getUint32(unboxValue(v_ref), true);
+						this._goRefCounts[id]--;
+						if (this._goRefCounts[id] === 0) {
+							const v = this._values[id];
+							this._values[id] = null;
+							this._ids.delete(v);
+							this._idPool.push(id);
+						}
 					},
 
 					// func stringVal(value string) ref
@@ -465,6 +470,8 @@
 			this._ids = new Map();  // mapping from JS values to reference ids
 			this._idPool = [];      // unused ids that have been garbage collected
 			this.exited = false;    // whether the Go program has exited
+
+			const mem = new DataView(this._inst.exports.memory.buffer)
 
 			while (true) {
 				const callbackPromise = new Promise((resolve) => {
