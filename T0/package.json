@@ -1,0 +1,15 @@
+{
+  "name": "tinygo-wasm-nodejs-example",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "build": "tinygo build -o main.wasm -target wasm ./main.go",
+    "dev": "node index.js",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "type": "module",
+  "keywords": [],
+  "author": "",
+  "license": "MIT"
+}
