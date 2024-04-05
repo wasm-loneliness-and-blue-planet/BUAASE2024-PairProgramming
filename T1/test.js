@@ -11,8 +11,7 @@ const wasmBuffer = fs.readFileSync("./t1-go/main.wasm");
 const go = new Go();
 const module = await WebAssembly.instantiate(wasmBuffer, go.importObject);
 go.run(module.instance);
-const { bocchiShutUp } = module.instance.exports;
-
+const { bocchiShutUp } = globalThis;
 assert.strictEqual(bocchiShutUp(1,[13,14,15,21,11,16],6),10);
 assert.strictEqual(bocchiShutUp(2,[13,14,13,11,21,13,21,22],8),21);
 

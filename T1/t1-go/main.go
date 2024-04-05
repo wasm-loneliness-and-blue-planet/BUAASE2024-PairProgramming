@@ -18,21 +18,29 @@ Translated with DeepL.com (free version)
 
 package main
 
-// import (
-//   "fmt"
-// )
+import (
+	"fmt"
+	"syscall/js"
+)
 
 // Declare a main function, this is the entrypoint into our go module
 // That will be run. In our example, we won't need this
 func main() {
-	/*
-		array := [11]int{21, 21, 21, 21, 21, 21, 26, 26, 26, 26, 26}
-		res := bocchiShutUp(2, array[:], 11)
-		fmt.Println(res)
-	*/
+	wait := make(chan struct{})
+	js.Global().Set("bocchiShutUp", js.FuncOf(BocchiShutUp))
+	<-wait
 }
 
-//export bocchiShutUp
+func BocchiShutUp(this js.Value, args []js.Value) interface{} {
+	flag := args[0].Int()
+	size := args[2].Int()
+	seq := make([]int, size)
+	for i := 0; i < size; i++ {
+		seq[i] = args[1].Index(i).Int()
+	}
+	return js.ValueOf(bocchiShutUp(flag, seq, size))
+}
+
 func bocchiShutUp(flag int, seq []int, size int) int {
 	var counts [6]int
 	var offset int
@@ -43,6 +51,7 @@ func bocchiShutUp(flag int, seq []int, size int) int {
 	}
 	for i := 0; i < size; i++ {
 		number := seq[i]
+		fmt.Print(number, " ")
 		if number < offset || number > offset+5 {
 			continue
 		}
@@ -51,7 +60,7 @@ func bocchiShutUp(flag int, seq []int, size int) int {
 
 	var maxValue int = -1
 	var maxIndex int = 0
-	var multipleMax bool = false
+	var multipleMax = false
 	for i := 0; i < 6; i++ {
 		if counts[i] > maxValue {
 			multipleMax = false
