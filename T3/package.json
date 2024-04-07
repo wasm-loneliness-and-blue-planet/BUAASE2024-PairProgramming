@@ -4,8 +4,8 @@
   "description": "",
   "main": "test.js",
   "scripts": {
-    "build1": "./build1.sh",
-    "build2": "./build2.sh",
+    "build": "./build.sh",
+    "build-windows": ".\\build.ps1",
     "submit-test": "node test.js"
   },
   "type": "module",

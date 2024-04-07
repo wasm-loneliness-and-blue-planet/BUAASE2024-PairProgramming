@@ -120,7 +120,7 @@ func (m *mancalaGame) playOneStep(step int) error {
 		return errors.New("Wrong player")
 	}
 	fromHoleIndex := step%10 - 1
-	println("Playing from ", player, fromHoleIndex)
+	// println("Playing from ", player, fromHoleIndex)
 	err, nextPlayer := m.sow(player, fromHoleIndex)
 	if err != nil {
 		return err

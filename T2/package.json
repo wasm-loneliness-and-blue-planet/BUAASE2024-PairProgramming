@@ -5,6 +5,7 @@
   "main": "test.js",
   "scripts": {
     "build": "./build.sh",
+    "build-windows": ".\\build.ps1",
     "submit-test": "node test.js"
   },
   "type": "module",
