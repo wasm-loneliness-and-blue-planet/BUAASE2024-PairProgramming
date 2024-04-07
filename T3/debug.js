@@ -10,26 +10,25 @@ import { mancalaOperator as op1_ } from "./t3-2-go/t3-2-go.js";
 // import { mancalaOperator as op2 } from "./t3-2-as-rival/build/release.js";
 // import { mancala_operator as op2 } from "./t3_2_rust_rival/pkg/t3_2_rust.js"
 // [Write your own "import" for other PLs.]
-import { mancalaOperator as op2_ } from "./t3-2-cpp-rival/t3_2_cpp.js";
+import { mancalaOperator as op2_ } from "./t3-2-another-rival/rival.js";
 
 // Choose proper "import" depending on your PL.
 // import { mancalaBoard as board } from "./t3-1-as/build/release.js";
 // import { mancala_board as board } from "./t3_1_rust/pkg/t3_1_rust.js"
 // [Write your own "import" for other PLs.]
 import { mancalaBoard as board_ } from "./t3-1-go/t3-1-go.js"
-import { exit } from "process";
 
 function logger(fn, name=fn.name) {
     return (...args) => {
-        console.info({name, "called with": args});
+        // console.info({name, "called with": args});
         const res = fn(...args);
         console.info({name, "returns": res});
         return res;
     }
 }
 
-const op1 = logger(op1_, "op1");
-const op2 = logger(op2_, "op2");
+const op1 = logger(op1_, "go op");
+const op2 = logger(op2_, "c++ op");
 const board = logger(board_, "board");
 
 // clear console
@@ -42,15 +41,6 @@ let op1Time = 0, op2Time = 0, timeStamp = 0;
 // Firstly, start from op1.
 operator = 1;
 status = [4,4,4,4,4,4,0,4,4,4,4,4,4,0];
-/*
-4  [9 9 10 0 3 1]
-------------------------------
-  {[4 4 0 0 0 0] 4}
-*/
-// status = [
-//     4, 4, 0, 0, 0, 0, 4,
-//     1, 3, 0, 10, 9, 9, 4
-// ]
 operation = 0;
 operationSequence = [];
 isEnded = false;
@@ -61,7 +51,6 @@ do {
         operation = op1(1, status);
         op1Time += performance.now() * 1000 - timeStamp;
         operationSequence.push(operation);
-        console.log({operationSequence});
         boardReturn = board(1, operationSequence, operationSequence.length);
     } else {
         timeStamp = performance.now() * 1000;
@@ -83,11 +72,10 @@ do {
     }
 } while (!isEnded);
 
-
+console.info({op1Result, op2Result, op1Time, op2Time});
 // clear console
 console.clear();
-
-// exit(0);
+// exit(0)
 
 // Now change to start from op2.
 operator = 2;
@@ -123,6 +111,9 @@ do {
     }
 } while (!isEnded);
  
+// console.clear();
+console.info({op1Result, op2Result, op1Time, op2Time});
+
 op1Time = op1Time / 1000;
 op2Time = op2Time / 1000;
 

@@ -35,7 +35,6 @@ do {
         operation = op1(1, status);
         op1Time += performance.now() * 1000 - timeStamp;
         operationSequence.push(operation);
-        console.log({operationSequence});
         boardReturn = board(1, operationSequence, operationSequence.length);
     } else {
         timeStamp = performance.now() * 1000;

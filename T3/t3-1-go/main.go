@@ -54,7 +54,7 @@ type mancalaGame struct {
 
 func (m *mancalaGame) print() {
 
-	fmt.Println("------------------------------")
+	fmt.Println("-----------------------------")
 	fmt.Print(m.Boards[1].Store)
 	fmt.Print("  ")
 	reverse := make([]int, 6)
@@ -62,10 +62,9 @@ func (m *mancalaGame) print() {
 		reverse[i] = m.Boards[1].Holes[5-i]
 	}
 	fmt.Println(reverse)
-	fmt.Println("------------------------------")
-	fmt.Print("  ")
+	fmt.Print("-----------------------------\n   ")
 	fmt.Println(m.Boards[0])
-	fmt.Println("------------------------------")
+	fmt.Println("-----------------------------")
 }
 
 func reverseArray(arr []int) {
@@ -139,16 +138,18 @@ func (m *mancalaGame) playOneStep(step int) error {
 
 func (m *mancalaGame) checkEnd() bool {
 	// 6. **游戏结束：**有一方的所有棋洞中都没有棋子时，游戏结束。此时，**所有玩家不能再进行操作**。另一方的棋洞中仍有棋子，**这些棋子全部放到己方的计分洞中**，即作为**仍有棋子的这一方的得分**的一部分。
-	playersNoEmptyHoles := [2]bool{false, false}
 	isEnd := false
 	for i := 0; i < 2; i++ {
-		for j := 0; j < 6; j++ {
-			if m.Boards[i].Holes[j] > 0 {
-				playersNoEmptyHoles[i] = true
+		empty := true
+		for _, count := range m.Boards[i].Holes {
+			if count > 0 {
+				empty = false
 				break
 			}
 		}
-		if !playersNoEmptyHoles[i] {
+		if empty {
+			m.print()
+			println("player", i+1, "has no stones.")
 			isEnd = true
 			break
 		}
@@ -172,15 +173,6 @@ func (m *mancalaGame) checkEnd() bool {
 	return true
 }
 
-func (m *mancalaGame) getWinner() (int, int) {
-	netScore := m.Boards[0].Store - m.Boards[1].Store
-	if netScore > 0 {
-		return 0, netScore
-	} else {
-		return 1, -netScore
-	}
-}
-
 // 返回值数组的元素个数为 15，每位数字的含义如下：
 //
 //	| 位 0 - 5                | 位 6                    | 位 7 - 12               | 位 13                   | 位 14  |
@@ -194,16 +186,13 @@ func mancalaMidBoard(flag int, seq []int, size int) []interface{} {
 	invalid := false
 	for i, v := range seq {
 		// 1. Detect if the seq is following the rules
-		// m.print()
-		// println("Played", v)
 		err := m.playOneStep(v)
 		if err != nil {
 			println(err)
 			invalid = true
 			break
 		}
-		// m.print()
-		// println("///////////////////")
+
 		// 2. Check if the game ends
 		if m.checkEnd() {
 			if i == size-1 {
@@ -219,24 +208,14 @@ func mancalaMidBoard(flag int, seq []int, size int) []interface{} {
 		res[j] = m.Boards[0].Holes[j]
 		res[j+7] = m.Boards[1].Holes[j]
 	}
-	println("2 stores", m.Boards[0].Store, m.Boards[1].Store)
 	res[6] = m.Boards[0].Store
 	res[13] = m.Boards[1].Store
 
 	if m.IsEnd && !invalid {
-		winner, netScore := m.getWinner()
-		if netScore == 0 {
-			res[14] = 200
-		} else {
-			if m.FirstHand == winner {
-				res[14] = 200 + netScore
-			} else {
-				res[14] = 200 - netScore
-			}
-		}
+		netScore := m.Boards[0].Store - m.Boards[1].Store
+		println("Game end, net score", netScore)
+		res[14] = 200 + netScore
 	} else if !invalid { // not ending
-		// println("> next turn (0/1)", m.WhoseTurn)
-		// println("> next player (hand)", m.getHander())
 		res[14] = m.getHander()
 	} else /* invalid = true */ if flag == 1 {
 		res[14] = 200 + 2*m.Boards[0].Store - 48
@@ -247,12 +226,5 @@ func mancalaMidBoard(flag int, seq []int, size int) []interface{} {
 }
 
 func (m *mancalaGame) getHander() int {
-	// if m.FirstHand == 1 {
-	// 	return m.WhoseTurn + 1
-	// } else if m.WhoseTurn == 0 {
-	// 	return 2
-	// } else {
-	// 	return 1
-	// }
 	return m.WhoseTurn + 1
 }

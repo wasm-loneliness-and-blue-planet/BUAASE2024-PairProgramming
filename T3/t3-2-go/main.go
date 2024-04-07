@@ -2,7 +2,6 @@ package main
 
 import (
 	"errors"
-	"fmt"
 	"syscall/js"
 )
 
@@ -56,23 +55,6 @@ type mancalaGame struct {
 	WhoseTurn int // 此处 0 指先手，1 指后手，不是玩家 1 / 2
 	FirstHand int // 此处 1 指玩家 1，2 指玩家 2
 	IsEnd     bool
-}
-
-func (m *mancalaGame) print() {
-	fmt.Println("------------------------------")
-	fmt.Print(m.Boards[1].Store)
-	fmt.Print("  ")
-	reverse := make([]int, 6)
-
-	for i := 0; i < 6; i++ {
-		reverse[i] = m.Boards[1].Holes[5-i]
-	}
-
-	fmt.Println(reverse)
-	fmt.Println("------------------------------")
-	fmt.Print("  ")
-	fmt.Println(m.Boards[0])
-	fmt.Println("------------------------------")
 }
 
 func reverseArray(arr []int) {
@@ -185,7 +167,6 @@ func (it *moveIterator) Next() (mancalaGame, int, bool) {
 
 func (m *mancalaGame) evaluate(player int) int {
 	score := m.Boards[player].Store - m.Boards[1-player].Store
-	println("Evaluating final depth: ", score)
 	return score
 }
 
@@ -207,15 +188,15 @@ func mancalaOperator(flag int, status []int) int {
 		IsEnd:     false,
 	}
 
-	eval, nextStep := minimax(&game, player, 3, -9999, 9999)
+	// eval, nextStep := naiveMinimax(&game, player, 4)
+	_, nextStep := αβMinimax(&game, player, 6, -9999, 9999)
 	nextStep = flag*10 + nextStep + 1
-	println("++ Eval: ", eval, " Step: ", nextStep)
 	return nextStep
 }
 
-// The `player` parameter is always the same — from which player's perspective for decision. We determine the current move during simulation by `WhoseTurn`.
+// The `player` parameter is always the same — from which player's perspective for decision, i.e. the maximizing player. We determine the current move during simulation by `WhoseTurn`.
 // Returns the best score and the best move.
-func minimax(m *mancalaGame, player int, depth int, alpha int, beta int) (int, int) {
+func naiveMinimax(m *mancalaGame, player int, depth int) (int, int) {
 	// 终止条件: 如果到达指定的深度或游戏结束
 	if depth == 1 || m.checkEnd() {
 		// 返回当前状态的评估分数
@@ -226,21 +207,79 @@ func minimax(m *mancalaGame, player int, depth int, alpha int, beta int) (int, i
 	// 遍历所有可能的移动
 	it := moveIterator{m, player, 0}
 	nextStep := 0
-	m.print()
+	// m.print()
 	for game, i, ok := it.Next(); ok; game, i, ok = it.Next() {
-		eval, _ := minimax(&game, player, depth-1, alpha, beta)
-		println("$$ Depth:", depth, "Step: ", nextStep, "Eval", eval, "MaxEval: ", maxEval)
+		eval, _ := naiveMinimax(&game, player, depth-1)
+		// println("$$ Depth:", depth, "Step: ", nextStep, "Eval", eval, "MaxEval: ", maxEval)
 		if eval > maxEval {
 			maxEval = eval
 			nextStep = i
 		}
-		// alpha = max(alpha, eval)
-		// if beta <= alpha {
-		// 	break // 剪枝
-		// }
 	}
 	if maxEval == -9999 {
 		maxEval = m.evaluate(player)
 	}
 	return maxEval, nextStep
+}
+
+// The `player` parameter is always the same — from which player's perspective for decision, i.e. the maximizing player. We determine the current move during simulation by `WhoseTurn`.
+// Returns the best score and the best move.
+// https://oi-wiki.org/search/alpha-beta/
+func αβMinimax(m *mancalaGame, player int, depth int, alpha int, beta int) (int, int) {
+	if depth == 1 || m.checkEnd() {
+		return m.evaluate(player), -1
+	}
+	nextStep := -1
+	if m.WhoseTurn == player { // maximizing player
+		maxEval := -9999
+		it := moveIterator{m, player, 0}
+		for game, i, ok := it.Next(); ok; game, i, ok = it.Next() {
+			countLeft := 48 - (game.Boards[0].Store + game.Boards[1].Store)
+			eval, _ := αβMinimax(&game, player, depth-1, alpha, beta)
+			if game.WhoseTurn == player {
+				eval += eval
+			}
+			if countLeft < 13 {
+				eval += eval / 2
+			}
+
+			if eval > maxEval {
+				maxEval = eval
+				nextStep = i
+			}
+			alpha = max(alpha, eval)
+			if beta <= alpha {
+				break
+			}
+		}
+		if maxEval == -9999 {
+			maxEval = m.evaluate(player)
+		}
+		return maxEval, nextStep
+	} else {
+		minEval := 9999
+		it := moveIterator{m, player, 0}
+		for game, i, ok := it.Next(); ok; game, i, ok = it.Next() {
+			countLeft := 48 - (game.Boards[0].Store + game.Boards[1].Store)
+			eval, _ := αβMinimax(&game, player, depth-1, alpha, beta)
+			if game.WhoseTurn == player {
+				eval += eval / 2
+			}
+			if countLeft < 13 {
+				eval += eval / 3
+			}
+			if eval < minEval {
+				minEval = eval
+				nextStep = i
+			}
+			beta = min(beta, eval)
+			if beta <= alpha {
+				break
+			}
+		}
+		if minEval == 9999 {
+			minEval = m.evaluate(player)
+		}
+		return minEval, nextStep
+	}
 }
