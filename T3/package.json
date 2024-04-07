@@ -4,6 +4,7 @@
   "description": "",
   "main": "test.js",
   "scripts": {
+    "build1": "./build1.sh",
     "submit-test": "node test.js"
   },
   "type": "module",
