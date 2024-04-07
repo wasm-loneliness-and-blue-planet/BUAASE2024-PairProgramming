@@ -9,5 +9,10 @@ import { mancalaResult } from "./t2-go/t2-go.js";
 
 assert.strictEqual(mancalaResult(1,[11,12],2),30001);
 assert.strictEqual(mancalaResult(1,[14],1),20001);
+assert.strictEqual(mancalaResult(1, [11, 12], 2), 30001);
+assert.strictEqual(mancalaResult(1, [14], 1), 20001);
+assert.strictEqual(mancalaResult(1, [], 0), 20000);
+// assert.strictEqual(mancalaResult(1, [11], 1), 30001);
+assert.strictEqual(mancalaResult(1, [11, 12, 11, 12, 11, 12], 1), 20000);
 
 console.log("🎉 You have passed all the tests provided.");
