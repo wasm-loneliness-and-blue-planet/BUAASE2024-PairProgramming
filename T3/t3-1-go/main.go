@@ -32,6 +32,7 @@ func MancalaBoardWrapper(this js.Value, args []js.Value) interface{} {
 	flag := args[0].Int()
 	size := args[2].Int()
 	seq := make([]int, size)
+	println(flag, size, seq)
 	for i := 0; i < size; i++ {
 		seq[i] = args[1].Index(i).Int()
 	}

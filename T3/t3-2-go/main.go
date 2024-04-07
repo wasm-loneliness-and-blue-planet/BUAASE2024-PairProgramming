@@ -12,6 +12,42 @@ func main() {
 	<-wait
 }
 
+func MancalaOperator(this js.Value, args []js.Value) interface{} {
+	/*
+	   - 函数名：`mancalaOperator()` 或者 `mancala_operator()` etc.，根据你选择的编程语言选择合适的命名格式；
+
+	   - 参数：
+
+	     - 一个 i32 类型数字 `flag`，为 `1` 或 `2`：代表应该为哪位选手思考行棋决策；
+
+	     - 一个 i32 类型数组 `status`：
+
+	     - 数组的元素个数为 14，每位数字的含义如下：
+
+	       | 位 0 - 5                | 位 6                    | 位 7 - 12               | 位 13                   |
+	       | ----------------------- | ----------------------- | ----------------------- | ----------------------- |
+	       | 棋洞 11 - 16 中的棋子数 | 选手 1 计分洞中的棋子数 | 棋洞 21 - 26 中的棋子数 | 选手 2 计分洞中的棋子数 |
+
+	   - 返回值：一个 i32 类型数字，代表**根据目前的棋盘状况，为了取得更大的净胜棋数，选手 `flag` 应当分配哪个棋洞中的棋子**。
+	*/
+	flag := args[0].Int()
+	if flag != 1 && flag != 2 {
+		return js.ValueOf("invalid flag")
+	}
+	status := make([]int, 14)
+	for i := 0; i < 14; i++ {
+		element := args[1].Index(i)
+		if element.Type() != js.TypeNumber {
+			// return js.ValueOf("Mancala operator has invalid status: status is not a 14-element arr")
+		}
+		status[i] = element.Int()
+	}
+	println("flag: ", flag, " status: ", status)
+	return js.ValueOf(4)
+	nextStep := mancalaOperator(flag, status)
+	return js.ValueOf(nextStep)
+}
+
 func NewMancalaGame(firstHand int) mancalaGame {
 	return mancalaGame{
 		WhoseTurn: 0,
@@ -26,18 +62,6 @@ func NewMancalaBoard() mancalaBoard {
 		Holes: [6]int{4, 4, 4, 4, 4, 4},
 		Store: 0,
 	}
-}
-
-func MancalaBoard(this js.Value, args []js.Value) interface{} {
-	flag := args[0].Int()
-	size := args[2].Int()
-	seq := make([]int, size)
-	for i := 0; i < size; i++ {
-		seq[i] = args[1].Index(i).Int()
-	}
-	result := mancalaResult(flag, seq, size)
-	// return a JS array
-	return js.ValueOf(result)
 }
 
 type mancalaBoard struct {
@@ -129,6 +153,12 @@ func (m *mancalaGame) playOneStep(step int) error {
 	return nil
 }
 
+func (m *mancalaGame) makeMove(player, fromHoleIndex int) (error, mancalaGame) {
+	cloned := *m
+	err, _ := cloned.sow(player, fromHoleIndex)
+	return err, cloned
+}
+
 func (m *mancalaGame) checkEnd() bool {
 	// 6. **游戏结束：**有一方的所有棋洞中都没有棋子时，游戏结束。此时，**所有玩家不能再进行操作**。另一方的棋洞中仍有棋子，**这些棋子全部放到己方的计分洞中**，即作为**仍有棋子的这一方的得分**的一部分。
 	playersNoEmptyHoles := make([]bool, 2)
@@ -165,6 +195,29 @@ func (m *mancalaGame) checkEnd() bool {
 	return true
 }
 
+type moveIterator struct {
+	game   *mancalaGame
+	player int
+	index  int
+}
+
+func (it *moveIterator) Next() (mancalaGame, bool) {
+	for i := it.index; i < 6; {
+		it.index++
+		if it.game.Boards[it.player].Holes[i] > 0 {
+			err, game := it.game.makeMove(it.player, i)
+			if err == nil {
+				return game, true
+			}
+		}
+	}
+	return mancalaGame{}, false
+}
+
+func (m *mancalaGame) evaluate(player int) int {
+	return m.Boards[player].Store - m.Boards[1-player].Store
+}
+
 func (m *mancalaGame) getWinner() (int, int) {
 	netScore := m.Boards[0].Store - m.Boards[1].Store
 	if netScore > 0 {
@@ -174,65 +227,48 @@ func (m *mancalaGame) getWinner() (int, int) {
 	}
 }
 
-func mancalaResult(flag int, seq []int, size int) []int {
-	firstHand := seq[0] / 10
-	m := NewMancalaGame(firstHand)
-	res := make([]int, 15)
-	invalid := false
-	for i := 0; i < size; i++ {
-		// 1. Detect if the seq is following the rules
-		m.print()
-		err := m.playOneStep(seq[i])
-		if err != nil {
-			println(err)
-			invalid = true
-			break
-		}
-		// 2. Check if the game ends
-		if m.checkEnd() {
-			if i == size-1 {
-				winner, netScore := m.getWinner()
-				if netScore == 0 {
-					res[15] = 200
-				} else {
-					if m.FirstHand == winner {
-						res[15] = 200 + netScore
-					} else {
-						res[15] = 200 - netScore
-					}
-				}
-				return res
-			} else {
-				invalid = true
-			}
-		}
+func mancalaOperator(flag int, status []int) int {
+	game := mancalaGame{
+		Boards: [2]mancalaBoard{
+			{
+				Holes: [6]int{status[0], status[1], status[2], status[3], status[4], status[5]},
+				Store: status[6],
+			},
+			{
+				Holes: [6]int{status[7], status[8], status[9], status[10], status[11], status[12]},
+				Store: status[13],
+			},
+		},
+		WhoseTurn: flag,
+		FirstHand: 0,
+		IsEnd:     false,
 	}
-	for j := 0; j < 5; j++ {
-		res[j] = m.Boards[0].Holes[j]
-		res[j+6] = m.Boards[1].Holes[j]
-	}
-	res[13] = m.Boards[0].Store
-	res[14] = m.Boards[1].Store
+	eval, nextStep := minimax(&game, flag, 5, -999, 999)
+	println("Eval: ", eval, " Step: ", nextStep)
+	return nextStep
+}
 
-	if m.IsEnd {
-		return res
+func minimax(m *mancalaGame, player int, depth int, alpha int, beta int) (int, int) {
+	// 终止条件: 如果到达指定的深度或游戏结束
+	if depth == 0 || m.checkEnd() {
+		// 返回当前状态的评估分数
+		return m.evaluate(player), -1
 	}
-	if !invalid {
-		nextPlayer := m.WhoseTurn // 0 or 1
-		if m.FirstHand == 1 {
-			nextPlayer += 1
-		} else {
-			if nextPlayer == 0 {
-				nextPlayer = 1
-			}
+
+	maxEval := -9999
+	// 遍历所有可能的移动
+	it := moveIterator{m, player, 0}
+	nextStep := 0
+	for game, ok := it.Next(); ok; game, ok = it.Next() {
+		eval, _ := minimax(&game, player, depth-1, alpha, beta)
+		maxEval = max(maxEval, eval)
+		if maxEval == eval {
+			nextStep = it.index - 1
 		}
-		res[15] = nextPlayer
-		return res
+		alpha = max(alpha, eval)
+		if beta <= alpha {
+			break // 剪枝
+		}
 	}
-	if flag == 1 {
-		res[15] = 200 + 2*m.Boards[0].Store - 48
-	} else {
-		res[15] = 200 + 48 - 2*m.Boards[1].Store
-	}
-	return res
+	return maxEval, nextStep
 }

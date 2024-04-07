@@ -5,6 +5,7 @@
   "main": "test.js",
   "scripts": {
     "build1": "./build1.sh",
+    "build2": "./build2.sh",
     "submit-test": "node test.js"
   },
   "type": "module",
