@@ -62,6 +62,12 @@ func objGetter(this js.Value, args []js.Value) interface{} {
 	return obj.Get(key)
 }
 
+func arrReturner(this js.Value, args []js.Value) interface{} {
+	array := make([]interface{}, 16)
+	array[5] = 233
+	return array
+}
+
 func main() {
 	state = 233
 	wait := make(chan struct{}, 0)
@@ -69,5 +75,6 @@ func main() {
 	js.Global().Set("splitter2", js.FuncOf(splitter2))
 	js.Global().Set("arrGetter", js.FuncOf(arrGetter))
 	js.Global().Set("objGetter", js.FuncOf(objGetter))
+	js.Global().Set("arrReturner", js.FuncOf(arrReturner))
 	<-wait
 }

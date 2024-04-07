@@ -13,23 +13,6 @@ func main() {
 }
 
 func MancalaOperator(this js.Value, args []js.Value) interface{} {
-	/*
-	   - 函数名：`mancalaOperator()` 或者 `mancala_operator()` etc.，根据你选择的编程语言选择合适的命名格式；
-
-	   - 参数：
-
-	     - 一个 i32 类型数字 `flag`，为 `1` 或 `2`：代表应该为哪位选手思考行棋决策；
-
-	     - 一个 i32 类型数组 `status`：
-
-	     - 数组的元素个数为 14，每位数字的含义如下：
-
-	       | 位 0 - 5                | 位 6                    | 位 7 - 12               | 位 13                   |
-	       | ----------------------- | ----------------------- | ----------------------- | ----------------------- |
-	       | 棋洞 11 - 16 中的棋子数 | 选手 1 计分洞中的棋子数 | 棋洞 21 - 26 中的棋子数 | 选手 2 计分洞中的棋子数 |
-
-	   - 返回值：一个 i32 类型数字，代表**根据目前的棋盘状况，为了取得更大的净胜棋数，选手 `flag` 应当分配哪个棋洞中的棋子**。
-	*/
 	flag := args[0].Int()
 	if flag != 1 && flag != 2 {
 		return js.ValueOf("invalid flag")
@@ -42,8 +25,7 @@ func MancalaOperator(this js.Value, args []js.Value) interface{} {
 		}
 		status[i] = element.Int()
 	}
-	println("flag: ", flag, " status: ", status)
-	return js.ValueOf(4)
+	// println("flag: ", flag, " status: ", status)
 	nextStep := mancalaOperator(flag, status)
 	return js.ValueOf(nextStep)
 }
@@ -81,9 +63,11 @@ func (m *mancalaGame) print() {
 	fmt.Print(m.Boards[1].Store)
 	fmt.Print("  ")
 	reverse := make([]int, 6)
+
 	for i := 0; i < 6; i++ {
 		reverse[i] = m.Boards[1].Holes[5-i]
 	}
+
 	fmt.Println(reverse)
 	fmt.Println("------------------------------")
 	fmt.Print("  ")
@@ -97,66 +81,49 @@ func reverseArray(arr []int) {
 	}
 }
 
-func (m *mancalaGame) sow(player, fromHoleIndex int) (error, int) {
+func (m *mancalaGame) sow(player, fromHoleIndex int) (int, error) {
 	// 1. Get the number of stones in the hole
-	count := m.Boards[player].Holes[fromHoleIndex]
-	if count == 0 {
-		return errors.New("No stones in the hole"), -1
+	totalCount := m.Boards[player].Holes[fromHoleIndex]
+	if totalCount == 0 {
+		return -1, errors.New("no stones in the hole")
 	}
+	m.Boards[player].Holes[fromHoleIndex] = 0
 	boardIndex := player
 	holeIndex := fromHoleIndex + 1
-	for count > 0 {
+	for count := totalCount; count > 0; count-- {
 		board := &m.Boards[boardIndex]
 		if holeIndex == 6 {
 			if boardIndex == player { // 对于己方计分洞需要分配棋子
 				board.Store++
-				if count == 0 { // 如果正好落在己方记分洞中，则当前玩家再下一次
-					return nil, boardIndex
+				if count == 1 { // 如果正好落在己方记分洞中，则当前玩家再下一次
+					return boardIndex, nil
 				}
 			} // 对于对方计分洞直接跳过
 			boardIndex = 1 - boardIndex // 切换到对方
 			holeIndex = 0
-		} else {
+		} else if count == 1 && board.Holes[holeIndex] == 0 && boardIndex == player {
+			// **取子：**如果**最后播撒下的一颗棋子(count = 1)**落在**己方<u>无棋子</u>的棋洞**中，且该棋洞**正对面对方的棋洞**中**<u>有棋子</u>**，则将**这最后一颗棋子**和**正对面对方坑洞内的<u>所有</u>棋子**都放入**己方计分洞**，也就是说全部成为自己的得分。
 			opponentBoard := &m.Boards[1-boardIndex]
-			if board.Holes[holeIndex] == 0 && opponentBoard.Holes[holeIndex] > 0 {
-				board.Store += 1 + opponentBoard.Holes[holeIndex]
-				opponentBoard.Holes[holeIndex] = 0
-			} else {
-				board.Holes[holeIndex]++
-			}
+			board.Holes[holeIndex] += opponentBoard.Holes[5-holeIndex] + 1
+			opponentBoard.Holes[5-holeIndex] = 0
+		} else {
+			board.Holes[holeIndex]++
 			holeIndex++
 		}
-		count--
 	}
-	return nil, 1 - player
+	return 1 - player, nil
 }
 
-func (m *mancalaGame) playOneStep(step int) error {
-	player := step / 10
-	if m.FirstHand == 1 {
-		// 1, 2 => 0, 1
-		player -= 1
-	} else if player == 2 {
-		// 1, 2 => 1, 0
-		player = 0
-	}
-	if player != m.WhoseTurn {
-		return errors.New("Wrong player")
-	}
-	fromHoleIndex := step%10 - 1
-	println("Playing from ", player, fromHoleIndex)
-	err, nextPlayer := m.sow(player, fromHoleIndex)
+func (m *mancalaGame) makeMove(fromHoleIndex int) (mancalaGame, error) {
+	clonedGame := *m
+	// println("It's ", clonedGame.WhoseTurn, "'s turn.")
+	player, err := clonedGame.sow(clonedGame.WhoseTurn, fromHoleIndex)
 	if err != nil {
-		return err
+		return clonedGame, err
 	}
-	m.WhoseTurn = nextPlayer
-	return nil
-}
-
-func (m *mancalaGame) makeMove(player, fromHoleIndex int) (error, mancalaGame) {
-	cloned := *m
-	err, _ := cloned.sow(player, fromHoleIndex)
-	return err, cloned
+	clonedGame.WhoseTurn = player
+	// println("It'll be player ", clonedGame.WhoseTurn, "'s turn.")
+	return clonedGame, err
 }
 
 func (m *mancalaGame) checkEnd() bool {
@@ -201,33 +168,29 @@ type moveIterator struct {
 	index  int
 }
 
-func (it *moveIterator) Next() (mancalaGame, bool) {
-	for i := it.index; i < 6; {
+func (it *moveIterator) Next() (mancalaGame, int, bool) {
+	for i := it.index; i < 6; i = it.index {
+		// println("iteration", i, "pieces", it.game.Boards[it.player].Holes[i])
 		it.index++
 		if it.game.Boards[it.player].Holes[i] > 0 {
-			err, game := it.game.makeMove(it.player, i)
+			game, err := it.game.makeMove(i)
 			if err == nil {
-				return game, true
+				// println("Returning")
+				return game, i, true
 			}
 		}
 	}
-	return mancalaGame{}, false
+	return mancalaGame{}, -1, false
 }
 
 func (m *mancalaGame) evaluate(player int) int {
-	return m.Boards[player].Store - m.Boards[1-player].Store
-}
-
-func (m *mancalaGame) getWinner() (int, int) {
-	netScore := m.Boards[0].Store - m.Boards[1].Store
-	if netScore > 0 {
-		return 0, netScore
-	} else {
-		return 1, -netScore
-	}
+	score := m.Boards[player].Store - m.Boards[1-player].Store
+	println("Evaluating final depth: ", score)
+	return score
 }
 
 func mancalaOperator(flag int, status []int) int {
+	player := flag - 1
 	game := mancalaGame{
 		Boards: [2]mancalaBoard{
 			{
@@ -239,18 +202,22 @@ func mancalaOperator(flag int, status []int) int {
 				Store: status[13],
 			},
 		},
-		WhoseTurn: flag,
-		FirstHand: 0,
+		WhoseTurn: player,
+		FirstHand: 1, // unnecessary
 		IsEnd:     false,
 	}
-	eval, nextStep := minimax(&game, flag, 5, -999, 999)
-	println("Eval: ", eval, " Step: ", nextStep)
+
+	eval, nextStep := minimax(&game, player, 3, -9999, 9999)
+	nextStep = flag*10 + nextStep + 1
+	println("++ Eval: ", eval, " Step: ", nextStep)
 	return nextStep
 }
 
+// The `player` parameter is always the same — from which player's perspective for decision. We determine the current move during simulation by `WhoseTurn`.
+// Returns the best score and the best move.
 func minimax(m *mancalaGame, player int, depth int, alpha int, beta int) (int, int) {
 	// 终止条件: 如果到达指定的深度或游戏结束
-	if depth == 0 || m.checkEnd() {
+	if depth == 1 || m.checkEnd() {
 		// 返回当前状态的评估分数
 		return m.evaluate(player), -1
 	}
@@ -259,16 +226,21 @@ func minimax(m *mancalaGame, player int, depth int, alpha int, beta int) (int, i
 	// 遍历所有可能的移动
 	it := moveIterator{m, player, 0}
 	nextStep := 0
-	for game, ok := it.Next(); ok; game, ok = it.Next() {
+	m.print()
+	for game, i, ok := it.Next(); ok; game, i, ok = it.Next() {
 		eval, _ := minimax(&game, player, depth-1, alpha, beta)
-		maxEval = max(maxEval, eval)
-		if maxEval == eval {
-			nextStep = it.index - 1
+		println("$$ Depth:", depth, "Step: ", nextStep, "Eval", eval, "MaxEval: ", maxEval)
+		if eval > maxEval {
+			maxEval = eval
+			nextStep = i
 		}
-		alpha = max(alpha, eval)
-		if beta <= alpha {
-			break // 剪枝
-		}
+		// alpha = max(alpha, eval)
+		// if beta <= alpha {
+		// 	break // 剪枝
+		// }
+	}
+	if maxEval == -9999 {
+		maxEval = m.evaluate(player)
 	}
 	return maxEval, nextStep
 }

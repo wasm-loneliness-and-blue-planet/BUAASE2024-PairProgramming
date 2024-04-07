@@ -24,3 +24,4 @@ console.log(arrGetter([13, 14, 15, 21, 11, 16], 5));
 console.log(
   objGetter({ a: 1, b: [true, 666, "hahaha", { key: "value" }], c: 3 }, "b")
 );
+console.log(arrReturner())

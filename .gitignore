@@ -1,3 +1,6 @@
 *.wasm
 *.exe
 package-lock.json
+*.log
+/T3/t3-*
+!/T3/t3-*-go

@@ -72,39 +72,37 @@ func reverseArray(arr []int) {
 	}
 }
 
-func (m *mancalaGame) sow(player, fromHoleIndex int) (error, int) {
+func (m *mancalaGame) sow(player, fromHoleIndex int) (int, error) {
 	// 1. Get the number of stones in the hole
-	count := m.Boards[player].Holes[fromHoleIndex]
-	if count == 0 {
-		return errors.New("No stones in the hole"), -1
+	totalCount := m.Boards[player].Holes[fromHoleIndex]
+	if totalCount == 0 {
+		return -1, errors.New("no stones in the hole")
 	}
+	m.Boards[player].Holes[fromHoleIndex] = 0
 	boardIndex := player
 	holeIndex := fromHoleIndex + 1
-	for count > 0 {
+	for count := totalCount; count > 0; count-- {
 		board := &m.Boards[boardIndex]
 		if holeIndex == 6 {
 			if boardIndex == player { // 对于己方计分洞需要分配棋子
 				board.Store++
-				if count == 0 { // 如果正好落在己方记分洞中，则当前玩家再下一次
-					return nil, boardIndex
+				if count == 1 { // 如果正好落在己方记分洞中，则当前玩家再下一次
+					return boardIndex, nil
 				}
 			} // 对于对方计分洞直接跳过
 			boardIndex = 1 - boardIndex // 切换到对方
 			holeIndex = 0
-		} else {
-			// **如果**最后播撒下的一颗棋子**落在**己方<u>无棋子</u>的棋洞**中，且该棋洞**正对面对方的棋洞**中**<u>有棋子</u>**，则将**这最后一颗棋子**和**正对面对方坑洞内的<u>所有</u>棋子**都放入**己方计分洞**，也就是说全部成为自己的得分。
+		} else if count == 1 && board.Holes[holeIndex] == 0 && boardIndex == player {
+			// **取子：**如果**最后播撒下的一颗棋子(count = 1)**落在**己方<u>无棋子</u>的棋洞**中，且该棋洞**正对面对方的棋洞**中**<u>有棋子</u>**，则将**这最后一颗棋子**和**正对面对方坑洞内的<u>所有</u>棋子**都放入**己方计分洞**，也就是说全部成为自己的得分。
 			opponentBoard := &m.Boards[1-boardIndex]
-			if board.Holes[holeIndex] == 0 && opponentBoard.Holes[holeIndex] > 0 {
-				board.Store += 1 + opponentBoard.Holes[holeIndex]
-				opponentBoard.Holes[holeIndex] = 0
-			} else {
-				board.Holes[holeIndex]++
-			}
+			board.Holes[holeIndex] += opponentBoard.Holes[5-holeIndex] + 1
+			opponentBoard.Holes[5-holeIndex] = 0
+		} else {
+			board.Holes[holeIndex]++
 			holeIndex++
 		}
-		count--
 	}
-	return nil, 1 - player
+	return 1 - player, nil
 }
 
 func (m *mancalaGame) playOneStep(step int) error {
@@ -120,8 +118,7 @@ func (m *mancalaGame) playOneStep(step int) error {
 		return errors.New("Wrong player")
 	}
 	fromHoleIndex := step%10 - 1
-	// println("Playing from ", player, fromHoleIndex)
-	err, nextPlayer := m.sow(player, fromHoleIndex)
+	nextPlayer, err := m.sow(player, fromHoleIndex)
 	if err != nil {
 		return err
 	}
