@@ -4,6 +4,7 @@
   "description": "",
   "main": "test.js",
   "scripts": {
+    "build": "tinygo build -o main.wasm -target wasm ./main.go",
     "submit-test": "node test.js"
   },
   "type": "module",
