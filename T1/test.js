@@ -6,7 +6,7 @@ import assert from "assert";
 // [Write your own "import" for other PLs.]
 
 import fs from "fs";
-import "./t1-go/wasm_exec.js";
+import "../wasm_exec.js";
 const wasmBuffer = fs.readFileSync("./t1-go/main.wasm");
 const go = new Go();
 const module = await WebAssembly.instantiate(wasmBuffer, go.importObject);

@@ -1,35 +1,23 @@
 package main
 
 import (
+	"errors"
 	"fmt"
-	// "syscall/js"
+	"syscall/js"
 )
 
-// func arrGetter(this js.Value, args []js.Value) interface{} {
-// 	array := args[0]
-// 	index := args[1].Int()
-// 	return array.Index(index)
-// }
-
-// func objGetter(this js.Value, args []js.Value) interface{} {
-// 	obj := args[0]
-// 	key := args[1].String()
-// 	return obj.Get(key)
-// }
-
 func main() {
-	// wait := make(chan struct{}, 0)
-	// js.Global().Set("arrGetter", js.FuncOf(arrGetter))
-	// js.Global().Set("objGetter", js.FuncOf(objGetter))
-	// <-wait
-	m := mancalaGame{}
-	m.print()
+	wait := make(chan struct{}, 0)
+	js.Global().Set("mancalaResult", js.FuncOf(MancalaResult))
+	<-wait
 }
 
-func NewMancalaGame() mancalaGame {
+func NewMancalaGame(firstHand int) mancalaGame {
 	return mancalaGame{
 		WhoseTurn: 0,
 		Boards:    [2]mancalaBoard{NewMancalaBoard(), NewMancalaBoard()},
+		FirstHand: firstHand,
+		IsEnd:     false,
 	}
 }
 
@@ -40,16 +28,16 @@ func NewMancalaBoard() mancalaBoard {
 	}
 }
 
-// func MancalaResult(this js.Value, args []js.Value) interface{} {
-// 	flag := args[0].Int()
-// 	size := args[2].Int()
-// 	seq := make([]int, size)
-// 	for i := 0; i < size; i++ {
-// 		seq[i] = args[1].Index(i).Int()
-// 	}
-// 	result := mancalaResult(flag, seq, size)
-// 	return js.ValueOf(result)
-// }
+func MancalaResult(this js.Value, args []js.Value) interface{} {
+	flag := args[0].Int()
+	size := args[2].Int()
+	seq := make([]int, size)
+	for i := 0; i < size; i++ {
+		seq[i] = args[1].Index(i).Int()
+	}
+	result := mancalaResult(flag, seq, size)
+	return js.ValueOf(result)
+}
 
 type mancalaBoard struct {
 	Holes [6]int
@@ -58,7 +46,9 @@ type mancalaBoard struct {
 
 type mancalaGame struct {
 	Boards    [2]mancalaBoard
-	WhoseTurn int
+	WhoseTurn int // 此处 0 指先手，1 指后手，不是玩家 1 / 2
+	FirstHand int // 此处 1 指玩家 1，2 指玩家 2
+	IsEnd     bool
 }
 
 func (m *mancalaGame) print() {
@@ -82,40 +72,126 @@ func reverseArray(arr []int) {
 	}
 }
 
-func (m *mancalaGame) sow(player int, holeIndex int, count int) {
+func (m *mancalaGame) sow(player, fromHoleIndex int) (error, int) {
+	// 1. Get the number of stones in the hole
+	count := m.Boards[player].Holes[fromHoleIndex]
+	if count == 0 {
+		return errors.New("No stones in the hole"), -1
+	}
+	boardIndex := player
+	holeIndex := fromHoleIndex + 1
 	for count > 0 {
-		m.Boards[player].Holes[holeIndex]++
-		count--
-		if holeIndex == 5 {
-			player = 1 - player
+		board := &m.Boards[boardIndex]
+		if holeIndex == 6 {
+			if boardIndex == player { // 对于己方计分洞需要分配棋子
+				board.Store++
+				if count == 0 { // 如果正好落在己方记分洞中，则当前玩家再下一次
+					return nil, boardIndex
+				}
+			} // 对于对方计分洞直接跳过
+			boardIndex = 1 - boardIndex // 切换到对方
 			holeIndex = 0
 		} else {
+			// **如果**最后播撒下的一颗棋子**落在**己方<u>无棋子</u>的棋洞**中，且该棋洞**正对面对方的棋洞**中**<u>有棋子</u>**，则将**这最后一颗棋子**和**正对面对方坑洞内的<u>所有</u>棋子**都放入**己方计分洞**，也就是说全部成为自己的得分。
+			opponentBoard := &m.Boards[1-boardIndex]
+			if board.Holes[holeIndex] == 0 && opponentBoard.Holes[holeIndex] > 0 {
+				board.Store += 1 + opponentBoard.Holes[holeIndex]
+				opponentBoard.Holes[holeIndex] = 0
+			} else {
+				board.Holes[holeIndex]++
+			}
 			holeIndex++
 		}
+		count--
 	}
+	return nil, 1 - player
 }
 
-func (m *mancalaGame) play(step int) error {
-	// TODO: check if valid
-	// the player choose one hole and sow the stones
+func (m *mancalaGame) playOneStep(step int) error {
 	player := step / 10
-	holeIndex := step % 10
-	if holeIndex < 0 || holeIndex >= 6 {
-		return fmt.Errorf("holeIndex out of range")
+	if m.FirstHand == 1 {
+		// 1, 2 => 0, 1
+		player -= 1
+	} else if player == 2 {
+		// 1, 2 => 1, 0
+		player = 0
 	}
-	count := m.Boards[player].Holes[holeIndex]
-	if count == 0 {
-		return fmt.Errorf("holeIndex is empty")
+	if player != m.WhoseTurn {
+		return errors.New("Wrong player")
 	}
-	m.Boards[player].Holes[holeIndex] = 0
-
+	fromHoleIndex := step%10 - 1
+	println("Playing from ", player, fromHoleIndex)
+	err, nextPlayer := m.sow(player, fromHoleIndex)
+	if err != nil {
+		return err
+	}
+	m.WhoseTurn = nextPlayer
 	return nil
 }
 
+func (m *mancalaGame) checkEnd() bool {
+	// 6. **游戏结束：**有一方的所有棋洞中都没有棋子时，游戏结束。此时，**所有玩家不能再进行操作**。另一方的棋洞中仍有棋子，**这些棋子全部放到己方的计分洞中**，即作为**仍有棋子的这一方的得分**的一部分。
+	playersNoEmptyHoles := make([]bool, 2)
+	isEnd := false
+	for i := 0; i < 2; i++ {
+		for j := 0; j < 6; j++ {
+			if m.Boards[i].Holes[j] > 0 {
+				playersNoEmptyHoles[i] = true
+				break
+			}
+		}
+		if !playersNoEmptyHoles[i] {
+			isEnd = true
+			break
+		}
+	}
+	if !isEnd {
+		return false
+	}
+
+	// 计算得分
+	score := [2]int{0, 0}
+	for i := 0; i < 2; i++ {
+		for j := 0; j < 6; j++ {
+			score[i] += m.Boards[i].Holes[j]
+		}
+	}
+	if score[0] == 0 {
+		m.Boards[0].Store += score[1]
+	} else {
+		m.Boards[1].Store += score[0]
+	}
+	m.IsEnd = true
+	return true
+}
+
+func (m *mancalaGame) getWinner() (int, int) {
+	netScore := m.Boards[0].Store - m.Boards[1].Store
+	if netScore > 0 {
+		return 0, netScore
+	} else {
+		return 1, -netScore
+	}
+}
+
 func mancalaResult(flag int, seq []int, size int) int {
-	// 1. Detect if the seq is following the rules
-
-	// 2. Check if the game ends
-
-	return 0
+	m := NewMancalaGame(flag)
+	for i := 0; i < size; i++ {
+		// 1. Detect if the seq is following the rules
+		m.print()
+		err := m.playOneStep(seq[i])
+		if err != nil {
+			println(err)
+			return 30000 + i
+		}
+		// 2. Check if the game ends
+		if m.checkEnd() {
+			if i == size-1 {
+				return 15000 + m.Boards[0].Store - m.Boards[1].Store
+			} else {
+				return 30000 + i + 1
+			}
+		}
+	}
+	return 20000 + m.Boards[0].Store
 }
